@@ -1,9 +1,8 @@
 use tokio::net::{TcpListener, TcpStream};
-use mini_redis::{Connection, Frame};
 use bytes::Bytes;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-
+use micro_redis::{Connection, Frame};
 type Db = Arc<Mutex<HashMap<String, Bytes>>>;
 
 #[tokio::main]
@@ -27,9 +26,9 @@ async fn main() {
 }
 async fn process(socket: TcpStream, db: Db) {
 
-    use mini_redis::Command::{self, Get, Set};
+    use micro_redis::Command::{self, Get, Set};
 
-    // Connection, provided by `mini-redis`, handles parsing frames from
+    // Connection, provided by `micro-redis`, handles parsing frames from
     // the socket
     let mut connection = Connection::new(socket);
 
