@@ -1,58 +1,25 @@
-use tokio::net::{TcpListener, TcpStream};
-use mini_redis::{Connection, Frame};
-use bytes::Bytes;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-
-type Db = Arc<Mutex<HashMap<String, Bytes>>>;
+use micro_redis::{Db, Shutdown, run_server};
+use tokio::net::TcpListener;
+use std::sync::Arc;
 
 #[tokio::main]
-async fn main() {
-    let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // tracing_subscriber::fmt::init();
+    // Create the shared database instance=
+    let db = Arc::new(Db::new()); 
 
-    println!("Listening");
+    // Set up the TCP listener
+    let listener = TcpListener::bind("127.0.0.1:6379").await?;
+    println!("Server is running at 127.0.0.1:6379");
 
-    let db: Db = Arc::new(Mutex::new(HashMap::new()));
-
-    loop {
-        let (socket, _) = listener.accept().await.unwrap();
-        // Clone the handle to the hash map.
-        let db = db.clone();
-
-        println!("Accepted");
-        tokio::spawn(async move {
-            process(socket, db).await;
-        });
-    }
-}
-async fn process(socket: TcpStream, db: Db) {
-
-    use mini_redis::Command::{self, Get, Set};
-
-    // Connection, provided by `mini-redis`, handles parsing frames from
-    // the socket
-    let mut connection = Connection::new(socket);
-
-    // Use `read_frame` to receive a command from the connection.
-    while let Some(frame) = connection.read_frame().await.unwrap() {
-        let response = match Command::from_frame(frame).unwrap() {
-            Set(cmd) => {
-                let mut db = db.lock().unwrap();
-                db.insert(cmd.key().to_string(), cmd.value().clone());
-                Frame::Simple("OK".to_string())
-            }
-            Get(cmd) => {
-                let db = db.lock().unwrap();
-                if let Some(value) = db.get(cmd.key()) {
-                    Frame::Bulk(value.clone())
-                } else {
-                    Frame::Null
-                }
-            }
-            cmd => panic!("unimplemented {:?}", cmd),
-        };
-
-        // Write the response to the client
-        connection.write_frame(&response).await.unwrap();
-    }
+    // Listen for the shutdown signal in another task or handling
+    let shutdown = Shutdown::new();
+    let shutdown_clone = shutdown.clone();
+    tokio::spawn(async move {
+        shutdown_clone.listen_for_ctrl_c().await;
+    });
+    // Run the server
+    run_server(listener, db, shutdown).await;
+    println!("Server has shut down");
+    Ok(())
 }
