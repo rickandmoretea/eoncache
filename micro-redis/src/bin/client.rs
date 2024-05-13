@@ -1,7 +1,6 @@
 use bytes::Bytes;
-use micro_redis::client;
+use mini_redis::client;
 use tokio::sync::{mpsc, oneshot};
-use tokio; 
 
 /// Multiple different commands are multiplexed over a single channel.
 #[derive(Debug)]
@@ -19,7 +18,7 @@ enum Command {
 
 /// Provided by the requester and used by the manager task to send the command
 /// response back to the requester.
-type Responder<T> = oneshot::Sender<micro_redis::Result<T>>;
+type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
 #[tokio::main]
 async fn main() {
@@ -28,7 +27,7 @@ async fn main() {
     let tx2 = tx.clone();
 
     let manager = tokio::spawn(async move {
-        // Open a connection to the micro-redis address.
+        // Open a connection to the mini-redis address.
         let mut client = client::connect("127.0.0.1:6379").await.unwrap();
 
         while let Some(cmd) = rx.recv().await {
@@ -66,7 +65,7 @@ async fn main() {
         let res = resp_rx.await;
         println!("GOT (Get) = {:?}", res);
     });
-    
+
     let t2 = tokio::spawn(async move {
         let (resp_tx, resp_rx) = oneshot::channel();
         let cmd = Command::Set {
