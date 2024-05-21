@@ -39,24 +39,32 @@ async fn process_connection(socket: TcpStream, db: Arc<Db>, mut shutdown_recv: b
     let mut connection = Connection::new(socket);
 
     while let Ok(Some(frame)) = connection.read_frame().await {
-        let mut parse = Parse::new(frame).unwrap();
-        match handle_command(&mut parse, &db).await {
-            Ok(response) => {
-                if connection.write_frame(&response).await.is_err() {
-                    eprintln!("Error sending response");
-                    break;
+        match Parse::new(frame) {
+            Ok(mut parse) => {
+                match handle_command(&mut parse, &db).await {
+                    Ok(response) => {
+                        if connection.write_frame(&response).await.is_err() {
+                            eprintln!("Error sending response");
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error handling command: {}", e);
+                        break;
+                    }
                 }
-            }
+            },
             Err(e) => {
-                eprintln!("Error handling command: {}", e);
-                break;
+                eprintln!("Error parsing frame: {}", e);
+                continue;  // or handle differently, depending on your error handling strategy
             }
         }
-
+    
         // Check for shutdown signal
         if shutdown_recv.try_recv().is_ok() {
             println!("Connection received shutdown signal...");
             break;
         }
     }
+    
 }

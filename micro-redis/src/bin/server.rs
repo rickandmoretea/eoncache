@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         shutdown_clone.listen_for_ctrl_c().await;
     });
     // Run the server
-    run_server(listener, db, shutdown).await;
+    let _ = run_server(listener, db, shutdown).await;
     println!("Server has shut down");
     Ok(())
 }

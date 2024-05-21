@@ -12,3 +12,11 @@ atoi = "2.0.0"
 structopt = "0.3.26"
 tracing = "0.1.40"
 tracing-futures = "0.2.5"
+
+[[bin]]
+name = "micro-redis-cli"
+path = "src/bin/cli.rs"
+
+[[bin]]
+name = "micro-redis-server"
+path = "src/bin/server.rs"

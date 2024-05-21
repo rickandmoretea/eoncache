@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use crate::{Db, Frame, Parse};
 use tokio::time::Duration;
-
+use tracing::{info, warn};
 
 pub async fn handle_command(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
     let command = parse.next_string()?.to_uppercase();
@@ -25,14 +25,33 @@ pub async fn handle_command(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Fr
     }
 }
 
-async fn handle_select(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
-    let index = parse.next_string()?.parse().map_err(|_| "Invalid index")?;
-    parse.finish()?;
-
-    db.select_namespace(index)
-        .map(|_| Frame::Simple("OK".to_string()))
-        .map_err(Into::into)
+pub async fn handle_select(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
+    match parse.next_int() {  // Directly parse as integer
+        Ok(index) if index < 16 => {  // Validate index range if there are 16 namespaces
+            match db.select_namespace(index as usize) {
+                Ok(_) => {
+                    info!("Namespace selected: {}", index);
+                    Ok(Frame::Simple("OK".to_string()))
+                },
+                Err(e) => {
+                    warn!("Failed to select namespace {}: {}", index, e);
+                    Err(e.into())
+                }
+            }
+        },
+        Ok(_) => {
+            let err_msg = format!("Invalid index: index out of allowed range (0-15)");
+            warn!("{}", err_msg);
+            Err(err_msg.into())
+        },
+        Err(_) => {
+            warn!("Failed to parse index for SELECT command");
+            Err("Failed to parse index".into())
+        }
+    }
 }
+
+
 
 async fn handle_set(parse: &mut Parse, db:  &Arc<Db>) -> crate::Result<Frame> {
     let key = parse.next_string()?;
@@ -64,7 +83,7 @@ async fn handle_exists(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> 
 async fn handle_rpush(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
     let key = parse.next_string()?;
     let value = parse.next_bytes()?;
-    parse.finish();
+    let _ = parse.finish();
     db.rpush(key, value);
     Ok(Frame::Simple("OK".to_string()))
 }
@@ -72,7 +91,7 @@ async fn handle_rpush(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
 async fn handle_lpush(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
     let key = parse.next_string()?;
     let value = parse.next_bytes()?;
-    parse.finish();
+    let _ = parse.finish();
     db.lpush(key, value);
     Ok(Frame::Simple("OK".to_string()))
 }
