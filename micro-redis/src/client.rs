@@ -21,15 +21,15 @@ impl Client {
 
 
     pub async fn select(&mut self, db: usize) -> crate::Result<usize> {
-        // Correctly format the SELECT command as an array of bulk strings
-        let cmd = format!("*2\r\n$6\r\nSELECT\r\n${}\r\n{}\r\n", db.to_string().len(), db);
-        // Send the command as a frame that respects Redis protocol
-        self.connection.write_frame(&Frame::Array(vec![
-            Frame::Bulk(Bytes::from("SELECT".as_bytes())),
-            Frame::Bulk(Bytes::from(db.to_string())),
-        ])).await?;
+        // Create the command parts as bulk strings
+        let command_part = Frame::Bulk(Bytes::from_static(b"SELECT"));
+        let db_part = Frame::Bulk(Bytes::from(db.to_string()));
     
-        // Read and process the response
+        // Send the command as an array of bulk strings
+        let cmd = Frame::Array(vec![command_part, db_part]);
+        self.connection.write_frame(&cmd).await?;
+    
+        // Wait for and process the response
         let response = self.read_response().await?;
         match response {
             Frame::Simple(msg) if msg == "OK" => Ok(db),
@@ -40,13 +40,17 @@ impl Client {
     
 
     pub async fn get(&mut self, key: &str) -> crate::Result<Option<Bytes>> {
-        let cmd: String = format!("GET {}\r\n", key);
-        self.connection.write_frame(&Frame::Bulk(Bytes::from(cmd))).await?;
+        let command_part = Frame::Bulk(Bytes::from_static(b"GET"));
+        let key_part = Frame::Bulk(Bytes::from(key.to_owned()));
+        let cmd = Frame::Array(vec![command_part, key_part]);
+
+        self.connection.write_frame(&cmd).await?;
         match self.read_response().await? {
             Frame::Bulk(data) => Ok(Some(data)),
             Frame::Null => Ok(None),
             frame => Err(Error::new(ErrorKind::Other, format!("Unexpected frame type: {:?}", frame)).into()),
         }
+
     }
 
     pub async fn set(&mut self, key: &str, value: &str) -> crate::Result<()> {

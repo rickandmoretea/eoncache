@@ -1,81 +1,121 @@
-use micro_redis::{client, Connection, Frame};
-use bytes::Bytes;
-use std::str;
-use std::time::Duration;
-use structopt::StructOpt;
+use micro_redis::client;
+use std::{str, io};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::sync::Mutex;
+use std::sync::Arc;
+use std::io::Write; 
 use micro_redis::Error;
-
-#[derive(StructOpt, Debug)]
-#[structopt(name = "mini-redis-cli", about = "A CLI for Redis operations")]
-struct Cli {
-    #[structopt(subcommand)]
-    command: Command,
-
-    #[structopt(long = "--host", default_value = "127.0.0.1")]
-    host: String,
-
-    #[structopt(long = "--port", default_value = "6379")]
-    port: u16,
-}
-
-#[derive(StructOpt, Debug)]
-enum Command {
-    /// Select the given database
-    Select { index: usize },
-    /// Get the value of a key
-    Get { key: String },
-    /// Set a key to hold the specified string value
-    Set { key: String, value: String },
-    /// Ping the server
-    Ping,
-    /// Check existence of key
-    Exists { key: String },
-}
-
-    // /// Append one or several values to a list
-    // RPush { key: String, values: Vec<String> },
-    // /// Prepend one or several values to a list
-    // LPush { key: String, values: Vec<String> },
-    // /// Remove and get the first element in a list, or block until one is available
-    // BLPop { keys: Vec<String>, timeout: u64 },
-    // /// Remove and get the last element in a list, or block until one is available
-    // BRPop { keys: Vec<String>, timeout: u64 },
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let cli = Cli::from_args();
-    let addr = format!("{}:{}", cli.host, cli.port);
-    let mut client = client::connect(&addr).await?;
+    println!("Connecting to Redis...");
+    let addr = "127.0.0.1:6379"; // Example, replace with actual configuration if needed
+    let client = client::connect(addr).await?;
 
-    match cli.command {
-        Command::Select { index } => {
-            let db = client.select(index).await?;
-            println!("Selected database: {}", db);
-        },
-        Command::Get { key } => {
-            let value = client.get(&key).await?;
-            match value {
-                Some(value) => println!("{}", str::from_utf8(&value)?),
-                None => println!("(nil)"),
+    let client = Arc::new(Mutex::new(client));
+    let stdin = BufReader::new(tokio::io::stdin());
+    let mut lines = stdin.lines();
+
+    println!("Connected to Redis at {}. Type commands (type 'exit' to quit):", addr);
+    print!("> ");
+    io::stdout().flush().unwrap(); // Make sure the prompt is displayed immediately
+
+    while let Ok(Some(line)) = lines.next_line().await {
+        if line.eq_ignore_ascii_case("exit") {
+            break;
+        }
+        
+        let parts: Vec<String> = line.split_whitespace().map(str::to_string).collect();
+        if parts.is_empty() {
+            continue;
+        }
+        
+
+        match parts[0].to_lowercase().as_str() {
+            "select" => {
+                if let Some(index_str) = parts.get(1) {
+                    if let Ok(index) = index_str.parse::<usize>() {
+                        let client = client.clone();
+                        tokio::spawn(async move {
+                            let res = client.lock().await.select(index).await;
+                            match res {
+                                Ok(_) => println!("Database {} selected", index),
+                                Err(e) => println!("Error: {}", e),
+                            }
+                        });
+                    } else {
+                        println!("Invalid database index.");
+                    }
+                } else {
+                    println!("Usage: SELECT <index>");
+                }
+            },
+            "get" => {
+                if let Some(key) = parts.get(1) {
+                    let key = key.to_string();  
+                    let client = client.clone();
+                    tokio::spawn(async move {
+                        let res = client.lock().await.get(&key).await;
+                        match res {
+                            Ok(Some(value)) => println!("\"{}\"", String::from_utf8_lossy(&value)),
+                            Ok(None) => println!("Key does not exist."),
+                            Err(e) => println!("Error retrieving key: {}", e),
+                        }
+                    });
+                } else {
+                    println!("Usage: GET <key>");
+                }
+            },
+            "set" => {
+                if parts.len() > 2 {
+                    let key = parts[1].to_string();
+                    let value = parts[2..].join(" ");
+                    let client = client.clone();
+                    tokio::spawn(async move {
+                        let res = client.lock().await.set(&key, &value).await;
+                        match res {
+                            Ok(_) => println!("OK"),
+                            Err(e) => println!("Error: {}", e),
+                        }
+                    });
+                } else {
+                    println!("Usage: SET <key> <value>");
+                }
+            },
+            "ping" => {
+                let client = client.clone();
+                tokio::spawn(async move {
+                    let res = client.lock().await.ping().await;
+                    match res {
+                        Ok(_) => println!("PONG"),
+                        Err(e) => println!("Error: {}", e),
+                    }
+                });
+            },
+            "exists" => {
+                if let Some(key) = parts.get(1) {
+                    let key = key.to_string();  // Clone the key here to create an owned String
+                    let client = client.clone();
+                    tokio::spawn(async move {
+                        let res = client.lock().await.exists(&key).await;
+                        match res {
+                            Ok(Some(value)) => println!("{}", String::from_utf8_lossy(&value)),
+                            Ok(None) => println!("(nil)"),
+                            Err(e) => println!("Error: {}", e),
+                        }
+                    });
+                } else {
+                    println!("Usage: EXISTS <key>");
+                }
+            },
+            _ => {
+                println!("Unsupported command. Available commands: SELECT, GET, SET, PING, EXISTS");
             }
-        },
-        Command::Set { key, value } => {
-            client.set(&key, &value).await?;
-            println!("OK");
-        },
-        Command::Ping => {
-            client.ping().await?;
-            println!("PONG");
-        },
-        Command::Exists { key } => {
-            let exist = client.exists(&key).await?;
-            match exist {
-                Some(value) => println!("{}", str::from_utf8(&value)?),
-                None => println!("(nil)"),
-            }
-        }, 
+        }
+
+        print!("> "); // Prompt for the next command
+        io::stdout().flush().unwrap(); // Make sure the prompt is displayed immediately
     }
 
     Ok(())
 }
-

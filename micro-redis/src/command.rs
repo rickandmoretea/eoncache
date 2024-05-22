@@ -4,6 +4,7 @@ use tokio::time::Duration;
 use tracing::{info, warn};
 
 pub async fn handle_command(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
+    println!("Received command: {:?}", parse);  // Debug output for incoming frames
     let command = parse.next_string()?.to_uppercase();
     match command.as_str() {
         "SELECT" => handle_select(parse, db).await,
@@ -24,17 +25,16 @@ pub async fn handle_command(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Fr
         _ => Err("Unsupported command".into()),
     }
 }
-
 pub async fn handle_select(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
     match parse.next_int() {  // Directly parse as integer
         Ok(index) if index < 16 => {  // Validate index range if there are 16 namespaces
             match db.select_namespace(index as usize) {
                 Ok(_) => {
-                    info!("Namespace selected: {}", index);
+                    println!("Selected namespace: {}", index);
                     Ok(Frame::Simple("OK".to_string()))
                 },
                 Err(e) => {
-                    warn!("Failed to select namespace {}: {}", index, e);
+                    println!("Failed to select namespace {}: {}", index, e);
                     Err(e.into())
                 }
             }
@@ -52,6 +52,27 @@ pub async fn handle_select(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Fra
 }
 
 
+async fn handle_get(parse: &mut Parse, db: &Db) -> crate::Result<Frame> {
+    println!("Attempting to handle GET command");  // Debug print
+    if let Ok(key) = parse.next_string() {
+        println!("Parsed key for GET: {}", key);  // Debug print
+        parse.finish()?;
+
+        match db.get(&key) {
+            Some(value) => {
+                println!("Found value for key '{}'", key);  // Debug print
+                Ok(Frame::Bulk(value))
+            },
+            None => {
+                println!("No value found for key '{}'", key);  // Debug print
+                Ok(Frame::Null)
+            },
+        }
+    } else {
+        println!("Failed to parse key for GET command");  // Debug print
+        Err("Failed to parse key for GET command".into())
+    }
+}
 
 async fn handle_set(parse: &mut Parse, db:  &Arc<Db>) -> crate::Result<Frame> {
     let key = parse.next_string()?;
@@ -59,14 +80,6 @@ async fn handle_set(parse: &mut Parse, db:  &Arc<Db>) -> crate::Result<Frame> {
     parse.finish()?;
     db.set(key, value);
     Ok(Frame::Simple("OK".to_string()))
-}
-async fn handle_get(parse: &mut Parse, db: &Db) -> crate::Result<Frame> {
-    let key = parse.next_string()?;
-    parse.finish()?;
-
-    db.get(&key)
-        .map(|value| Frame::Bulk(value))
-        .ok_or_else(|| "Key not found".into())
 }
 
 async fn handle_ping() -> crate::Result<Frame> {

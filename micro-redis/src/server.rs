@@ -34,37 +34,36 @@ pub async fn run_server(listener: TcpListener, db: Arc<Db>, shutdown: Shutdown) 
 
     Ok(())
 }
-
 async fn process_connection(socket: TcpStream, db: Arc<Db>, mut shutdown_recv: broadcast::Receiver<()>) {
     let mut connection = Connection::new(socket);
 
     while let Ok(Some(frame)) = connection.read_frame().await {
+        tracing::debug!("Received frame: {:?}", frame);
         match Parse::new(frame) {
             Ok(mut parse) => {
                 match handle_command(&mut parse, &db).await {
                     Ok(response) => {
                         if connection.write_frame(&response).await.is_err() {
-                            eprintln!("Error sending response");
+                            tracing::error!("Error sending response");
                             break;
                         }
-                    }
+                    },
                     Err(e) => {
-                        eprintln!("Error handling command: {}", e);
+                        tracing::error!("Error handling command: {}", e);
                         break;
                     }
                 }
             },
             Err(e) => {
-                eprintln!("Error parsing frame: {}", e);
-                continue;  // or handle differently, depending on your error handling strategy
+                tracing::error!("Error parsing frame: {}", e);
+                continue; // Skips further processing for this frame
             }
         }
-    
+
         // Check for shutdown signal
         if shutdown_recv.try_recv().is_ok() {
-            println!("Connection received shutdown signal...");
+            tracing::error!("Connection received shutdown signal...");
             break;
         }
     }
-    
 }

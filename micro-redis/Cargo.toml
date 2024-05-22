@@ -20,3 +20,5 @@ path = "src/bin/cli.rs"
 [[bin]]
 name = "micro-redis-server"
 path = "src/bin/server.rs"
+
+
