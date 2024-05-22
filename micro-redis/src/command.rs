@@ -88,9 +88,12 @@ async fn handle_ping() -> crate::Result<Frame> {
 
 async fn handle_exists(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
     let key = parse.next_string()?;
-    parse.finish()?;
-
-    Ok(Frame::Integer(db.exists(&key) as u64))
+    let _ = parse.finish();
+    if db.exists(&key) {
+        Ok(Frame::Integer(1))
+    } else {
+        Ok(Frame::Integer(0))
+    }
 }
 
 async fn handle_rpush(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {

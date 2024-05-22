@@ -54,13 +54,12 @@ impl Client {
     }
 
     pub async fn set(&mut self, key: &str, value: &str) -> crate::Result<()> {
-        // Correctly format a Redis command with multiple parts
-        let cmd = format!("*3\r\n$3\r\nSET\r\n${}\r\n{}\r\n${}\r\n{}\r\n", key.len(), key, value.len(), value);
-        
-        // Write the command to the connection
-        self.connection.write_frame(&Frame::Bulk(Bytes::from(cmd))).await?;
-        
-        // Wait for and process the response
+        let command_part = Frame::Bulk(Bytes::from_static(b"SET"));
+        let key_part = Frame::Bulk(Bytes::from(key.to_owned()));
+        let value_part = Frame::Bulk(Bytes::from(value.to_owned()));
+        let cmd = Frame::Array(vec![command_part, key_part, value_part]);
+
+        self.connection.write_frame(&cmd).await?;
         self.read_response().await.map(|_| ())
     }
     
@@ -71,8 +70,11 @@ impl Client {
     }
 
     pub async fn exists(&mut self, key: &str) -> crate::Result<Option<Bytes>> {
-        let cmd = format!("EXISTS {}\r\n", key);
-        self.connection.write_frame(&Frame::Bulk(Bytes::from(cmd))).await?;
+        let command_part = Frame::Bulk(Bytes::from_static(b"EXISTS"));
+        let key_part = Frame::Bulk(Bytes::from(key.to_owned()));
+        let cmd = Frame::Array(vec![command_part, key_part]);
+
+        self.connection.write_frame(&cmd).await?;
         match self.read_response().await? {
             Frame::Integer(n) => Ok(Some(Bytes::from(n.to_string()))),
             Frame::Null => Ok(None),

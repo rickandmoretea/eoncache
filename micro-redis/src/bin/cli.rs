@@ -18,7 +18,7 @@ async fn main() -> Result<(), Error> {
 
     println!("Connected to Redis at {}. Type commands (type 'exit' to quit):", addr);
     print!("> ");
-    io::stdout().flush().unwrap(); // Make sure the prompt is displayed immediately
+    io::stdout().flush().unwrap(); 
 
     while let Ok(Some(line)) = lines.next_line().await {
         if line.eq_ignore_ascii_case("exit") {
@@ -94,7 +94,7 @@ async fn main() -> Result<(), Error> {
             },
             "exists" => {
                 if let Some(key) = parts.get(1) {
-                    let key = key.to_string();  // Clone the key here to create an owned String
+                    let key = key.to_string();  
                     let client = client.clone();
                     tokio::spawn(async move {
                         let res = client.lock().await.exists(&key).await;
