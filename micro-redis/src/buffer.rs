@@ -26,8 +26,8 @@ enum Command {
     Exists(String),
     RPush(String, Bytes),
     LPush(String, Bytes),
-    BLPop(String, usize),
-    BRPop(String, usize),
+    // BLPop(String, usize),
+    // BRPop(String, usize),
 }
 
 // Message type sent over the channel to the connection task.
@@ -51,12 +51,11 @@ async fn run(mut client: Client, mut rx: Receiver<Message>) {
             Command::Exists(key) => client.exists(&key).await,
             Command::RPush(key, value) => client.rpush(&key, value).await.map(|_| None),
             Command::LPush(key, value) => client.lpush(&key, value).await.map(|_| None),
-            Command::BLPop(key, timeout) => {
-                client.blpop(&key, timeout).await.map(|opt| opt.map(|(k, v)| Bytes::from([k.as_ref(), v.as_ref()].concat())))
-            },
-            Command::BRPop(key, timeout) => {
-                client.brpop(&key, timeout).await.map(|opt| opt.map(|(k, v)| Bytes::from([k.as_ref(), v.as_ref()].concat())))
-            },
+            // Command::BLPop(key, timeout) => {
+            //     client.blpop(&key, timeout).await.map(|opt| opt.map(|(k, v)| Bytes::from([k.as_ref(), v.as_ref()].concat()))
+            // Command::BRPop(key, timeout) => {
+            //     client.brpop(&key, timeout).await.map(|opt| opt.map(|(k, v)| Bytes::from([k.as_ref(), v.as_ref()].concat())))
+            // },
         };
 
         let _ = tx.send(response.map_err(|e| e.into()));
@@ -211,39 +210,37 @@ impl Buffer {
         }
     }
 
-    /// Pop a value from the left end of a list.
-    pub async fn blpop(&mut self, key: &str, timeout: usize) -> Result<Option<Bytes>> {
-        // Initialize a new `BLPop` command to send via the channel.
-        let blpop = Command::BLPop(key.into(), timeout);
+    // pub async fn blpop(&mut self, key: &str, timeout: usize) -> Result<Option<Bytes>> {
+    //     // Initialize a new `BLPop` command to send via the channel.
+    //     let blpop = Command::BLPop(key.into(), timeout);
 
-        // Initialize a new oneshot to be used to receive the response back from the connection.
-        let (tx, rx) = oneshot::channel();
+    //     // Initialize a new oneshot to be used to receive the response back from the connection.
+    //     let (tx, rx) = oneshot::channel();
 
-        // Send the request
-        self.tx.send((blpop, tx)).await?;
+    //     // Send the request
+    //     self.tx.send((blpop, tx)).await?;
 
-        // Await the response
-        match rx.await {
-            Ok(res) => res,
-            Err(err) => Err(err.into()),
-        }
-    }
+    //     // Await the response
+    //     match rx.await {
+    //         Ok(res) => res,
+    //         Err(err) => Err(err.into()),
+    //     }
+    // }
 
-    /// Pop a value from the right end of a list.
-    pub async fn brpop(&mut self, key: &str, timeout: usize) -> Result<Option<Bytes>> {
-        // Initialize a new `BRPop` command to send via the channel.
-        let brpop = Command::BRPop(key.into(), timeout);
+    // pub async fn brpop(&mut self, key: &str, timeout: usize) -> Result<Option<Bytes>> {
+    //     // Initialize a new `BRPop` command to send via the channel.
+    //     let brpop = Command::BRPop(key.into(), timeout);
 
-        // Initialize a new oneshot to be used to receive the response back from the connection.
-        let (tx, rx) = oneshot::channel();
+    //     // Initialize a new oneshot to be used to receive the response back from the connection.
+    //     let (tx, rx) = oneshot::channel();
 
-        // Send the request
-        self.tx.send((brpop, tx)).await?;
+    //     // Send the request
+    //     self.tx.send((brpop, tx)).await?;
 
-        // Await the response
-        match rx.await {
-            Ok(res) => res,
-            Err(err) => Err(err.into()),
-        }
-    }
+    //     // Await the response
+    //     match rx.await {
+    //         Ok(res) => res,
+    //         Err(err) => Err(err.into()),
+    //     }
+    // }
 }

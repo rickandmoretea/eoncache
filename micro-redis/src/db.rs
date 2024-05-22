@@ -66,14 +66,28 @@ impl Db {
         ns.entries.contains_key(key)
     }
 
-    pub fn lpush(&self, key: String, value: Bytes) {
+    pub fn lpush(&self, key: String, value: Bytes) -> Result<usize, &'static str>{
         let mut ns = self.namespaces[*self.current_namespace_index.lock().unwrap()].lock().unwrap();
-        ns.lists.entry(key).or_insert_with(VecDeque::new).push_front(value);
+        match ns.entries.get(&key) {
+            Some(_) => Err("key holds a different type"),
+            None => {
+                let list = ns.lists.entry(key).or_insert_with(VecDeque::new);
+                list.push_front(value);
+                Ok(list.len())
+            },
+        }
     }
 
-    pub fn rpush(&self, key: String, value: Bytes) {
+    pub fn rpush(&self, key: String, value: Bytes) -> Result<usize, &'static str> {
         let mut ns = self.namespaces[*self.current_namespace_index.lock().unwrap()].lock().unwrap();
-        ns.lists.entry(key).or_insert_with(VecDeque::new).push_back(value);
+        match ns.entries.get(&key) {
+            Some(_) => Err("key holds a different type"),
+            None => {
+                let list = ns.lists.entry(key).or_insert_with(VecDeque::new);
+                list.push_back(value);
+                Ok(list.len())
+            },
+        }
     }
 
     pub async fn blpop(&self, keys: Vec<String>, timeout: Duration) -> Option<(String, Bytes)> {

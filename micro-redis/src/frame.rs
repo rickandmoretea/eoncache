@@ -135,6 +135,29 @@ impl Frame {
         }
     }
 
+    // pub fn as_bytes(&self) -> Result<Bytes, Error> {
+    //     match self {
+    //         Frame::Bulk(data) => Ok(data.clone()),
+    //         Frame::Simple(s) => Ok(Bytes::from(s.clone())),
+    //         _ => Err("Frame type does not contain byte data".into()),
+    //     }
+    // }
+    // pub fn to_string(&self) -> Result<String, Error> {
+    //     match self {
+    //         Frame::Simple(s) => Ok(s.clone()),
+    //         Frame::Bulk(data) => String::from_utf8(data.to_vec()).map_err(|_| "Invalid UTF-8".into()),
+    //         _ => Err("Frame type does not contain string data".into()),
+    //     }
+    // }
+
+    // pub fn to_vec(&self) -> Result<Vec<u8>, Error> {
+    //     match self {
+    //         Frame::Bulk(data) => Ok(data.to_vec()),
+    //         _ => Err("Frame type does not contain byte data".into()),
+    //     }
+    // }
+
+
 }
 
 impl PartialEq<&str> for Frame {

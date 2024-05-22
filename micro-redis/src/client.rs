@@ -83,76 +83,43 @@ impl Client {
     }
 
     pub async fn rpush(&mut self, key: &str, value: Bytes) -> crate::Result<Option<Bytes>> {
-        match std::str::from_utf8(&value) {
-            Ok(value_str) => {
-                let cmd = format!("RPUSH {} {}\r\n", key, value_str);
-                self.connection.write_frame(&Frame::Bulk(Bytes::from(cmd))).await?;
-                match self.read_response().await? {
-                    Frame::Integer(n) => Ok(Some(Bytes::from(n.to_string()))),
-                    Frame::Null => Ok(None),
-                    frame => Err(Error::new(ErrorKind::Other, format!("Unexpected frame type: {:?}", frame)).into()),
-                }
-            },
-            Err(_) => Err("Value is not valid UTF-8".into()),
+        let command_part = Frame::Bulk(Bytes::from_static(b"RPUSH"));
+        let key_part = Frame::Bulk(Bytes::from(key.to_owned()));
+        let value_part = Frame::Bulk(value);
+        let cmd = Frame::Array(vec![command_part, key_part, value_part]);
+
+        self.connection.write_frame(&cmd).await?;
+        match self.read_response().await? {
+            Frame::Integer(n) => Ok(Some(Bytes::from(n.to_string()))),
+            Frame::Null => Ok(None),
+            frame => Err(Error::new(ErrorKind::Other, format!("Unexpected frame type: {:?}", frame)).into()),
         }
+
     }
 
     pub async fn lpush(&mut self, key: &str, value: Bytes) -> crate::Result<Option<Bytes>> {
-        match std::str::from_utf8(&value) {
-            Ok(value_str) => {
-                let cmd = format!("LPUSH {} {}\r\n", key, value_str);
-                self.connection.write_frame(&Frame::Bulk(Bytes::from(cmd))).await?;
-                match self.read_response().await? {
-                    Frame::Integer(n) => Ok(Some(Bytes::from(n.to_string()))),
-                    Frame::Null => Ok(None),
-                    frame => Err(Error::new(ErrorKind::Other, format!("Unexpected frame type: {:?}", frame)).into()),
-                }
-            },
-            Err(_) => Err("Value is not valid UTF-8".into()),
-        }
-    }
+        let command_part = Frame::Bulk(Bytes::from_static(b"LPUSH"));
+        let key_part = Frame::Bulk(Bytes::from(key.to_owned()));
+        let value_part = Frame::Bulk(value);
+        let cmd = Frame::Array(vec![command_part, key_part, value_part]);
 
-    pub async fn blpop(&mut self, keys: &str, timeout: usize) -> crate::Result<Option<(Bytes, Bytes)>> {
-        let cmd = format!("BLPOP {} {}\r\n", keys, timeout);
-        self.connection.write_frame(&Frame::Bulk(Bytes::from(cmd))).await?;
+        self.connection.write_frame(&cmd).await?;
         match self.read_response().await? {
-            Frame::Array(frames) => {
-                if frames.len() == 2 {
-                    match (&frames[0], &frames[1]) {
-                        (Frame::Bulk(key), Frame::Bulk(value)) => Ok(Some((key.clone(), value.clone()))),
-                        _ => Err(Error::new(ErrorKind::Other, "Unexpected frame type").into()),
-                    }
-                } else {
-                    Err(Error::new(ErrorKind::Other, "Unexpected frame length").into())
-                }
-            },
+            Frame::Integer(n) => Ok(Some(Bytes::from(n.to_string()))),
             Frame::Null => Ok(None),
             frame => Err(Error::new(ErrorKind::Other, format!("Unexpected frame type: {:?}", frame)).into()),
         }
+    }
+
+    pub async fn blpop(&mut self, keys: &[String], timeout: usize) -> crate::Result<Option<(String, Bytes)>> {
+        todo!()
+}
+
+    
+    pub async fn brpop(&mut self, keys: &[String], timeout: usize) -> crate::Result<Option<(String, Bytes)>> {
+        todo!()
     }
     
-    pub async fn brpop(&mut self, key: &str, timeout: usize) -> crate::Result<Option<(Bytes, Bytes)>> {
-        let cmd = format!("BRPOP {} {}\r\n", key, timeout);
-        self.connection.write_frame(&Frame::Bulk(Bytes::from(cmd))).await?;
-        match self.read_response().await? {
-            Frame::Array(frames) => {
-                if frames.len() == 2 {
-                    match (&frames[0], &frames[1]) {
-                        (Frame::Bulk(key), Frame::Bulk(value)) => Ok(Some((key.clone(), value.clone()))),
-                        _ => Err(Error::new(ErrorKind::Other, "Unexpected frame type").into()),
-                    }
-                } else {
-                    Err(Error::new(ErrorKind::Other, "Unexpected frame length").into())
-                }
-            },
-            Frame::Null => Ok(None),
-            frame => Err(Error::new(ErrorKind::Other, format!("Unexpected frame type: {:?}", frame)).into()),
-        }
-    }
-
-
-
-
     async fn read_response(&mut self) -> crate::Result<Frame> {
         let response = self.connection.read_frame().await?;
 

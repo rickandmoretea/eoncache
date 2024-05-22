@@ -18,7 +18,7 @@ async fn main() -> Result<(), Error> {
 
     println!("Connected to Redis at {}. Type commands (type 'exit' to quit):", addr);
     print!("> ");
-    io::stdout().flush().unwrap(); 
+    io::stdout().flush().unwrap(); // Make sure the prompt is displayed immediately
 
     while let Ok(Some(line)) = lines.next_line().await {
         if line.eq_ignore_ascii_case("exit") {
@@ -94,7 +94,7 @@ async fn main() -> Result<(), Error> {
             },
             "exists" => {
                 if let Some(key) = parts.get(1) {
-                    let key = key.to_string();  
+                    let key = key.to_string();  // Clone the key here to create an owned String
                     let client = client.clone();
                     tokio::spawn(async move {
                         let res = client.lock().await.exists(&key).await;
@@ -108,8 +108,24 @@ async fn main() -> Result<(), Error> {
                     println!("Usage: EXISTS <key>");
                 }
             },
+            "rpush" => {
+                if parts.len() > 2 {
+                    let key = parts[1].to_string();
+                    let values = parts[2..].join(" ");
+                    let client = client.clone();
+                    tokio::spawn(async move {
+                        let res = client.lock().await.rpush(&key, values.into()).await;
+                        match res {
+                            Ok(len) => println!("{:?}", len),
+                            Err(e) => println!("Error: {}", e),
+                        }
+                    });
+                } else {
+                    println!("Usage: RPUSH <key> <value>");
+                }
+            },
             _ => {
-                println!("Unsupported command. Available commands: SELECT, GET, SET, PING, EXISTS");
+                println!("Unsupported command. Available commands: SELECT, GET, SET, PING, EXISTS, RPUSH");
             }
         }
 

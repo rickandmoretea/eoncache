@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use crate::{Db, Frame, Parse};
 use tokio::time::Duration;
-use tracing::{info, warn};
+use tracing::warn;
 
 pub async fn handle_command(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
     println!("Received command: {:?}", parse);  // Debug output for incoming frames
@@ -97,19 +97,36 @@ async fn handle_exists(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> 
 }
 
 async fn handle_rpush(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
-    let key = parse.next_string()?;
-    let value = parse.next_bytes()?;
-    let _ = parse.finish();
-    db.rpush(key, value);
-    Ok(Frame::Simple("OK".to_string()))
+    if let Ok(key) = parse.next_string() {
+        if let Ok(value) = parse.next_bytes() {
+            parse.finish()?;
+            match db.rpush(key, value) {
+                Ok(len) => Ok(Frame::Integer(len as u64)),
+                Err(e) => Err(e.into()),
+            }
+        } else {
+            Err("Failed to parse value for RPUSH command".into())
+        }
+    } else {
+        Err("Failed to parse key for RPUSH command".into())
+    }
 }
 
+
 async fn handle_lpush(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Frame> {
-    let key = parse.next_string()?;
-    let value = parse.next_bytes()?;
-    let _ = parse.finish();
-    db.lpush(key, value);
-    Ok(Frame::Simple("OK".to_string()))
+    if let Ok(key) = parse.next_string() {
+        if let Ok(value) = parse.next_bytes() {
+            parse.finish()?;
+            match db.lpush(key, value) {
+                Ok(len) => Ok(Frame::Integer(len as u64)),
+                Err(e) => Err(e.into()),
+            }
+        } else {
+            Err("Failed to parse value for LPUSH command".into())
+        }
+    } else {
+        Err("Failed to parse key for LPUSH command".into())
+    }
 }
 
 async fn handle_blpop(parse: &mut Parse, db: &Arc<Db>, timeout: f64) -> crate::Result<Frame> {
@@ -119,7 +136,7 @@ async fn handle_blpop(parse: &mut Parse, db: &Arc<Db>, timeout: f64) -> crate::R
     }
 
     if keys.is_empty() {
-        return Err("BLPOP requires keys specified".into());
+        return Err("BLPOP requires at least one key".into());
     }
 
     let timeout_duration = Duration::from_secs_f64(timeout);
@@ -130,6 +147,7 @@ async fn handle_blpop(parse: &mut Parse, db: &Arc<Db>, timeout: f64) -> crate::R
     }
 }
 
+
 async fn handle_brpop(parse: &mut Parse, db: &Arc<Db>, timeout: f64) -> crate::Result<Frame> {
     let mut keys = Vec::new();
     while let Ok(key) = parse.next_string() {
@@ -137,7 +155,7 @@ async fn handle_brpop(parse: &mut Parse, db: &Arc<Db>, timeout: f64) -> crate::R
     }
 
     if keys.is_empty() {
-        return Err("BRPOP requires keys specified".into());
+        return Err("BRPOP requires at least one key".into());
     }
 
     let timeout_duration = Duration::from_secs_f64(timeout);
