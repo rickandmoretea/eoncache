@@ -53,14 +53,24 @@ impl Db {
     pub fn get(&self, key: &str) -> Option<Bytes> {
         let ns = self.namespaces[*self.current_namespace_index.lock().unwrap()].lock().unwrap();
         ns.entries.get(key).map(|entry| entry.data.clone())
+            .or_else(|| {
+                ns.lists.get(key).map(|list| {
+                    // Serialize the list elements into a single Bytes object
+                    let serialized = list.iter()
+                        .map(|bytes| bytes.as_ref())
+                        .collect::<Vec<&[u8]>>()
+                        .join(&b' ');
+                    Bytes::from(serialized)
+                })
+            })
     }
 
-    /// Sets the value for a key in the current namespace, with an optional expiration time.
+    /// Sets the value for a key in the current namespace
     pub fn set(&self, key: String, value: Bytes) {
         let mut ns = self.namespaces[*self.current_namespace_index.lock().unwrap()].lock().unwrap();
         ns.entries.insert(key, Entry { data: value });
     }
-    /// Sets the value for a key in the current namespace, with an optional expiration time.
+    /// Sets the value for a key in the current namespace
     pub fn exists(&self, key: &str) -> bool {
         let ns = self.namespaces[*self.current_namespace_index.lock().unwrap()].lock().unwrap();
         ns.entries.contains_key(key)
@@ -68,26 +78,28 @@ impl Db {
 
     pub fn lpush(&self, key: String, value: Bytes) -> Result<usize, &'static str>{
         let mut ns = self.namespaces[*self.current_namespace_index.lock().unwrap()].lock().unwrap();
-        match ns.entries.get(&key) {
-            Some(_) => Err("key holds a different type"),
-            None => {
-                let list = ns.lists.entry(key).or_insert_with(VecDeque::new);
-                list.push_front(value);
-                Ok(list.len())
-            },
+        let entry = ns.entries.get(&key);
+
+        if entry.is_some() && ns.lists.get(&key).is_none() {
+            return Err("key holds a different type");
         }
+
+        let list = ns.lists.entry(key).or_insert_with(VecDeque::new);
+        list.push_front(value);
+        Ok(list.len())
     }
 
     pub fn rpush(&self, key: String, value: Bytes) -> Result<usize, &'static str> {
         let mut ns = self.namespaces[*self.current_namespace_index.lock().unwrap()].lock().unwrap();
-        match ns.entries.get(&key) {
-            Some(_) => Err("key holds a different type"),
-            None => {
-                let list = ns.lists.entry(key).or_insert_with(VecDeque::new);
-                list.push_back(value);
-                Ok(list.len())
-            },
+        let entry = ns.entries.get(&key);
+
+        if entry.is_some() && ns.lists.get(&key).is_none() {
+            return Err("key holds a different type");
         }
+
+        let list = ns.lists.entry(key).or_insert_with(VecDeque::new);
+        list.push_back(value);
+        Ok(list.len())
     }
 
     pub async fn blpop(&self, keys: Vec<String>, timeout: Duration) -> Option<(String, Bytes)> {

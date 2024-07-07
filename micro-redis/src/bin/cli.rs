@@ -128,8 +128,24 @@ async fn main() -> Result<(), Error> {
                     println!("Usage: RPUSH <key> <value>");
                 }
             },
+            "lpush" => {
+                if parts.len() > 2 {
+                    let key = parts[1].to_string();
+                    let values = parts[2..].join(" ");
+                    let client = client.clone();
+                    tokio::spawn(async move {
+                        let res = client.lock().await.lpush(&key, values.into()).await;
+                        match res {
+                            Ok(len) => println!("{:?}", len),
+                            Err(e) => println!("Error: {}", e),
+                        }
+                    });
+                } else {
+                    println!("Usage: LPUSH <key> <value>");
+                }
+            },
             _ => {
-                println!("Unsupported command. Available commands: SELECT, GET, SET, PING, EXISTS, RPUSH");
+                println!("Unsupported command. Available commands: SELECT, GET, SET, PING, EXISTS, RPUSH, LPUSH");
             }
         }
 
