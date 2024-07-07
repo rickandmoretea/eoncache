@@ -144,6 +144,12 @@ async fn main() -> Result<(), Error> {
                     println!("Usage: LPUSH <key> <value>");
                 }
             },
+
+
+            "help" => {
+                println!("Available commands: SELECT, GET, SET, PING, EXISTS, RPUSH, LPUSH");
+            },
+
             _ => {
                 println!("Unsupported command. Available commands: SELECT, GET, SET, PING, EXISTS, RPUSH, LPUSH");
             }

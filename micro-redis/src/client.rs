@@ -110,16 +110,14 @@ impl Client {
             frame => Err(Error::new(ErrorKind::Other, format!("Unexpected frame type: {:?}", frame)).into()),
         }
     }
-
-    pub async fn blpop(&mut self, keys: &[String], timeout: usize) -> crate::Result<Option<(String, Bytes)>> {
-        todo!()
-}
-
-    
-    pub async fn brpop(&mut self, keys: &[String], timeout: usize) -> crate::Result<Option<(String, Bytes)>> {
-        todo!()
+    pub async fn blpop(&mut self, _keys: &[String], _timeout: usize) -> crate::Result<Option<(String, Bytes)>> {
+        todo!("blpop")
     }
-    
+
+    pub async fn brpop(&mut self, _keys: &[String], _timeout: usize) -> crate::Result<Option<(String, Bytes)>> {
+        todo!("brpop")
+    }
+
     async fn read_response(&mut self) -> crate::Result<Frame> {
         let response = self.connection.read_frame().await?;
 
