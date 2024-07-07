@@ -40,7 +40,7 @@ pub async fn handle_select(parse: &mut Parse, db: &Arc<Db>) -> crate::Result<Fra
             }
         },
         Ok(_) => {
-            let err_msg = format!("Invalid index: index out of allowed range (0-15)");
+            let err_msg = "Invalid index: index out of allowed range (0-15)".to_string();
             warn!("{}", err_msg);
             Err(err_msg.into())
         },

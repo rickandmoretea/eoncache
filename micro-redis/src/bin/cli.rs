@@ -8,14 +8,14 @@ use micro_redis::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    let mut select_used = false;
     println!("Connecting to Redis...");
-    let addr = "127.0.0.1:6379"; // Example, replace with actual configuration if needed
+    let addr = "127.0.0.1:6379";
     let client = client::connect(addr).await?;
 
     let client = Arc::new(Mutex::new(client));
     let stdin = BufReader::new(tokio::io::stdin());
     let mut lines = stdin.lines();
-
     println!("Connected to Redis at {}. Type commands (type 'exit' to quit):", addr);
     print!("> ");
     io::stdout().flush().unwrap(); // Make sure the prompt is displayed immediately
@@ -33,7 +33,10 @@ async fn main() -> Result<(), Error> {
 
         match parts[0].to_lowercase().as_str() {
             "select" => {
-                if let Some(index_str) = parts.get(1) {
+                if select_used {
+                    println!("Error: SELECT can only be called at the start of the session");
+                }
+                else if let Some(index_str) = parts.get(1) {
                     if let Ok(index) = index_str.parse::<usize>() {
                         let client = client.clone();
                         tokio::spawn(async move {
@@ -43,11 +46,12 @@ async fn main() -> Result<(), Error> {
                                 Err(e) => println!("Error: {}", e),
                             }
                         });
+                        select_used = true;
                     } else {
                         println!("Invalid database index.");
                     }
                 } else {
-                    println!("Usage: SELECT <index>");
+                    println!("Usage: SELECT <index> (0-15) default 0");
                 }
             },
             "get" => {
