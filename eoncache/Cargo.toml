@@ -1,5 +1,5 @@
 [package]
-name = "micro-redis"
+name = "eoncache"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,11 +14,11 @@ tracing = "0.1.40"
 tracing-futures = "0.2.5"
 
 [[bin]]
-name = "micro-redis-cli"
+name = "eoncache-cli"
 path = "src/bin/cli.rs"
 
 [[bin]]
-name = "micro-redis-server"
+name = "eoncache-server"
 path = "src/bin/server.rs"
 
 

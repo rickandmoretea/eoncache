@@ -1,10 +1,10 @@
-use micro_redis::client;
+use eoncache::client;
 use std::{str, io};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::Mutex;
 use std::sync::Arc;
 use std::io::Write; 
-use micro_redis::Error;
+use eoncache::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {

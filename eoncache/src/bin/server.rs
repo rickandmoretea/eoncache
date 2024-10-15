@@ -1,4 +1,4 @@
-use micro_redis::{Db, Shutdown, run_server};
+use eoncache::{Db, Shutdown, run_server};
 use tokio::net::TcpListener;
 use std::sync::Arc;
 
